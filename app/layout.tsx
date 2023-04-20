@@ -44,6 +44,12 @@ export default function RootLayout({
       </head>
       <body className="flex flex-col overflow-hidden">
         {appConfigLoaded && <Layout>{children}</Layout>}
+        {/* <ColorPickerModal />
+        <SaveSceneModal />
+        <SceneModal />
+        <Navbar />
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto">{children}</main>
+        <BottomNavigation /> */}
       </body>
     </html>
   );

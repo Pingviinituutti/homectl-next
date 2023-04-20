@@ -21,12 +21,12 @@ export const ControlsCard = () => {
           size="lg"
           startIcon={<Bot size="3rem" />}
         />
-        <Button
+        {/* <Button
           color="ghost"
           className={carActive ? '' : 'text-zinc-700'}
           size="lg"
           startIcon={<Car size="3rem" />}
-        />
+        /> */}
       </Card.Body>
     </Card>
   );
