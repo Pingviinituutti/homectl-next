@@ -42,58 +42,74 @@ type StopTime = {
 
 type Stop = {
   name: string;
-  stoptimesWithoutPatterns: StopTime[];
+  stoptimesWithoutPatterns?: StopTime[];
+  stopTimesForPattern?: StopTime[];
 };
 
 type HslResponse = {
   data: {
-    stop: Stop;
+    [stop: string]: Stop;
   };
+  errors: any[];
 };
 
-const fetchCachedTrainSchedule = async (): Promise<Train[]> => {
-  const json = await cachedPromise('trainScheduleCache', 1, async () => {
+const fetchCachedTrainSchedule = async (stops: string[] = [], patterns: string[] = []): Promise<Train[]> => {
+  const body = '{'
+    + stops.map((stop, i) => 
+      `${`stop${i}:`} stop(id: "${stop}") {
+        name
+        ${
+          patterns[i] ? ` stopTimesForPattern(id: "${patterns[i]}", numberOfDepartures: 5) {` : 'stoptimesWithoutPatterns {'
+        }
+          scheduledDeparture
+          realtimeDeparture
+          realtime
+          realtimeState
+          serviceDay
+          headsign
+          trip {
+            routeShortName
+          }
+        }
+      }`).join('\n')
+  + '}';
+  const json = await cachedPromise('trainScheduleCache' + stops.join(''), 1, async () => {
+    // const query
     const res = await fetch(
-      'https://api.digitransit.fi/routing/v1/routers/hsl/index/graphql?digitransit-subscription-key=57e33952e51842a2b78d620428c5efc0',
+      `https://api.digitransit.fi/routing/v1/routers/hsl/index/graphql?digitransit-subscription-key=${process.env.NEXT_PUBLIC_DIGITRANSIT_KEY}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/graphql',
         },
-        body: `
-{
-  stop(id: "HSL:2131551") {
-    name
-    stoptimesWithoutPatterns {
-      scheduledDeparture
-      realtimeDeparture
-      realtime
-      realtimeState
-      serviceDay
-      headsign
-      trip {
-        routeShortName
-      }
-    }
-  }
-}
-      `,
+        body: body,
       },
     );
     const json: HslResponse = await res.json();
     return json;
   });
 
-  const stop = json.data.stop;
-  const trainsToCatch = stop.stoptimesWithoutPatterns.flatMap((st) => {
+  // console.log(JSON.stringify(json.data));
+
+  if (json.errors) {
+    return [];
+  }
+
+  const stopTimes = stops.map((_, i) => json.data['stop' + i].stoptimesWithoutPatterns || json.data['stop' + i].stopTimesForPattern).flat();
+  const trainsToCatch = stopTimes.flatMap((st) => {
+    if (st === undefined) return [];
     const secSinceMidnight = getSecSinceMidnight(new Date());
     const departureSecSinceMidnight = st.realtimeDeparture;
 
     const secUntilDeparture = departureSecSinceMidnight - secSinceMidnight;
     const minUntilDeparture = secUntilDeparture / 60;
 
-    const minUntilHomeDeparture = Math.floor(minUntilDeparture - 15);
-    if (minUntilHomeDeparture < -5) {
+    // in case the departure date of the vehicle is yesterday, the seconds will be calculated from yesterday too.
+    // -> calculation above leads to next departure being in 24 * 60 = 1440 + minUntilDeparture minutes from now.
+    // Easy fix with modulo because we can assume real-time departures never show departures that far away in the future. 
+    const minUntilHomeDeparture = (Math.floor(minUntilDeparture)) % 1440;
+
+    if (minUntilHomeDeparture < 0) {
       return [];
     }
 
@@ -107,7 +123,11 @@ const fetchCachedTrainSchedule = async (): Promise<Train[]> => {
     ];
   });
 
-  return trainsToCatch.slice(0, 5);
+  if (stops.length > 1) {
+    trainsToCatch.sort((a, b) => a.minUntilHomeDeparture - b.minUntilHomeDeparture);
+  }
+
+  return trainsToCatch.filter(s => s.minUntilHomeDeparture > 0).slice(0, 5);
 };
 
 type Train = {
@@ -122,14 +142,23 @@ function getSecSinceMidnight(d: Date) {
   return ((d as any as number) - e.setHours(0, 0, 0, 0)) / 1000;
 }
 
-export const TrainScheduleCard = () => {
+type TrainCardProps = {
+  title?: string,
+  stops?: string[],
+  patterns?: string[],
+}
+
+export const TrainScheduleCard = ({ title = 'Train', stops = [], patterns = [] }: TrainCardProps) => {
   const [trains, setTrains] = useState<Train[]>([]);
+  if (stops.length === 0) {
+    return null;
+  }
 
   useEffect(() => {
     let isSubscribed = true;
 
     const fetch = async () => {
-      const trains = await fetchCachedTrainSchedule();
+      const trains = await fetchCachedTrainSchedule(stops, patterns);
       if (isSubscribed === true) {
         setTrains(trains);
       }
@@ -142,17 +171,20 @@ export const TrainScheduleCard = () => {
   }, []);
 
   useInterval(async () => {
-    const trains = await fetchCachedTrainSchedule();
+    const trains = await fetchCachedTrainSchedule(stops, patterns);
+    // if (trains.length > 0) {
+    //   const sortedTrains = trains.toSorted((a, b) => a.minUntilHomeDepartur < b.minUntilDeparture);
+    // }
     setTrains(trains);
-  }, 1000);
+  }, 5000);
 
   return (
     <Card compact className="col-span-2">
       <Card.Body className="shadow-lg">
         <Table>
           <Table.Head>
-            <span>Train</span>
-            <span>Leave home in (min)</span>
+            <span>{title}</span>
+            <span>Leaves in (min)</span>
           </Table.Head>
           <Table.Body>
             {trains.map((train, index) => {

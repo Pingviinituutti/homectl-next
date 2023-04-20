@@ -13,7 +13,7 @@ export const ClockCard = () => {
   }, 1000);
 
   return (
-    <Card compact className="col-span-1">
+    <Card compact className="col-span-2">
       <Card.Body className="flex items-center justify-center shadow-lg">
         <span className="text-6xl">
           {time !== null && (

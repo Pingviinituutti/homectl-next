@@ -65,7 +65,7 @@ export const WeatherCard = () => {
   useInterval(async () => {
     const weather = await fetchCachedWeather();
     setWeather(weather);
-  }, 1000);
+  }, 10000);
 
   const jsx =
     weather !== null ? (
@@ -91,7 +91,7 @@ export const WeatherCard = () => {
     ) : null;
 
   return (
-    <Card compact className="col-span-1">
+    <Card compact className="col-span-2">
       <Card.Body className="shadow-lg">{jsx}</Card.Body>
     </Card>
   );

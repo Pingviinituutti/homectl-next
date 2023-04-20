@@ -31,7 +31,7 @@ export default function RootLayout({
         <SaveSceneModal />
         <SceneModal />
         <Navbar />
-        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col overflow-auto">{children}</main>
         <BottomNavigation />
       </body>
     </html>
