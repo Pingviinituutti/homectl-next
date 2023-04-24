@@ -16,7 +16,7 @@ export default function Page() {
         <WeatherCard />
       </div>  
       <ControlsCard />
-      {titles.map((t, i) => <TrainScheduleCard title={t} stops={stops[i]} patterns={patterns[i]} />)}
+      {titles.map((t, i) => <TrainScheduleCard title={t} stops={stops[i]} patterns={patterns[i]} key={`hsl-card-${i}`} />)}
     </div>
   );
 }
